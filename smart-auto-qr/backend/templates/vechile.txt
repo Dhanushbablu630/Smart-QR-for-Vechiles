@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-4">Vehicle Page</h1>
+
+<!-- Vehicle Info -->
+<div class="mb-6">
+  <p><strong>Owner:</strong> {{ vehicle.owner_name }}</p>
+  <p><strong>License Plate:</strong> {{ vehicle.license_plate }}</p>
+  
+  {% if vehicle.phone_shared %}
+    <p><strong>📞 Contact:</strong> {{ vehicle.phone }}</p>
+  {% else %}
+    <p class="text-gray-400">📞 Contact information not shared by the owner.</p>
+  {% endif %}
+</div>
+
+<!-- Flash messages -->
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      {% if "Message sent" in message or "Contact request" in message or "Incident" in message %}
+        <div class="mb-4 p-3 rounded bg-green-700 text-white">
+          {{ message }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+
+<!-- Message Form -->
+<div class="mb-6">
+  <form method="POST">
+    <input type="hidden" name="form_type" value="send_message">
+    <input type="text" name="sender_name" placeholder="Your name (optional)" class="input w-full mb-2 text-white bg-black">
+    <textarea name="message" placeholder="Write a message to the owner..." required class="input w-full mb-2 text-white bg-black h-24"></textarea>
+    <button type="submit" class="btn">Send Message</button>
+  </form>
+</div>
+
+<!-- Contact Request -->
+<div class="mb-6">
+  <form method="POST">
+    <input type="hidden" name="form_type" value="request_contact">
+    <input type="text" name="requester" placeholder="Your name (optional)" class="input w-full mb-2 text-white bg-black">
+    <button type="submit" class="btn">Request Contact</button>
+  </form>
+</div>
+
+<!-- Incident Report -->
+<div class="mb-6">
+  <form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="form_type" value="incident_report">
+    <input type="text" name="incident_sender_name" placeholder="Your name (optional)" class="input w-full mb-2 text-white bg-black">
+    <textarea name="incident_message" placeholder="Report an issue..." required class="input w-full mb-2 text-white bg-black h-24"></textarea>
+    <input type="file" name="incident_image" class="input w-full mb-2">
+    <button type="submit" class="btn">Report Incident</button>
+  </form>
+</div>
+
+<!-- Owner Shared Photos (if any) -->
+{% if vehicle.trip_photos %}
+  <h2 class="text-xl font-semibold mt-6 mb-4">Trip Photos</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {% for photo in vehicle.trip_photos %}
+      <div class="card p-2">
+        <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}" class="w-full h-48 object-cover rounded cursor-pointer gallery-img" data-img-url="{{ url_for('static', filename='uploads/' ~ photo.filename) }}">
+        {% if photo.description %}
+          <p class="mt-2 text-sm">{{ photo.description }}</p>
+        {% endif %}
+        {% if photo.location %}
+          <p class="text-xs text-gray-400">
+            📍 <a href="https://www.google.com/maps/search/{{ photo.location | urlencode }}" target="_blank" class="underline">{{ photo.location }}</a>
+          </p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<!-- Modal for enlarged image -->
+<div class="modal fade" id="imgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <img src="" id="modalImage" class="img-fluid rounded">
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const imgs = document.querySelectorAll(".gallery-img");
+    imgs.forEach(img => {
+      img.addEventListener("click", () => {
+        const url = img.getAttribute("data-img-url");
+        document.getElementById("modalImage").src = url;
+        const modal = new bootstrap.Modal(document.getElementById("imgModal"));
+        modal.show();
+      });
+    });
+  });
+</script>
+
+{% endblock %}

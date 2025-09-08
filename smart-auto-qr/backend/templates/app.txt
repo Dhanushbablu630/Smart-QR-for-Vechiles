@@ -1,0 +1,327 @@
+import qrcode
+import requests
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from werkzeug.utils import secure_filename
+import uuid
+import os
+from models import db, Vehicle, Message, ContactRequest, TripPhoto, Album, IncidentReport , Owner
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+app = Flask(__name__)
+app.secret_key = 'supersecretkey'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+UPLOAD_FOLDER = os.path.join('backend', 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin123"
+
+db.init_app(app)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def send_telegram_notification(text):
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
+        try:
+            requests.post(url, data=data)
+        except Exception as e:
+            print("❌ Telegram error:", e)
+
+def generate_qr(plate):
+    with app.app_context():
+        vehicle_url = url_for('vehicle_page', vehicle_id=plate, _external=True)
+        vehicle_url = f"http://192.168.1.3/vehicle/{plate}"
+        img = qrcode.make(vehicle_url)
+        qr_folder = os.path.join('backend', 'static', 'qr_codes')
+        os.makedirs(qr_folder, exist_ok=True)
+        img.save(os.path.join(qr_folder, f"{plate}.png"))
+
+@app.route('/create_db')
+def create_db():
+    db.create_all()
+    return "✅ Database created!"
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        license_plate = request.form.get("license_plate")
+        owner_name = request.form.get("owner_name")
+        phone = request.form.get("phone")
+
+        if not (license_plate and owner_name and phone):
+            flash("⚠️ All fields are required.")
+            return redirect(url_for('register'))
+
+        if Vehicle.query.filter_by(license_plate=license_plate).first():
+            flash("❌ Vehicle already registered.")
+            return redirect(url_for('register'))
+
+        vehicle = Vehicle(
+            license_plate=license_plate,
+            owner_name=owner_name,
+            phone=phone,
+            phone_shared=False
+        )
+        db.session.add(vehicle)
+        db.session.commit()
+
+        # Generate QR
+        generate_qr(license_plate)
+
+        flash("✅ Vehicle registered successfully!")
+        return redirect(url_for('vehicle_page', vehicle_id=license_plate))
+
+    return render_template("register.html")
+
+@app.route('/add_sample')
+def add_sample():
+    # Check if sample owner already exists
+    existing_owner = Owner.query.filter_by(name="Dhanush").first()
+    if not existing_owner:
+        existing_owner = Owner(name="Dhanush", phone="9876543210")
+        existing_owner.set_password("samplepass")
+
+        db.session.add(existing_owner)
+        db.session.commit()
+
+    # Check if sample vehicle exists
+    if Vehicle.query.filter_by(license_plate="TS09AB1234").first():
+        return "Sample vehicle already exists!"
+
+    sample = Vehicle(
+        license_plate="TS09AB1234",
+        owner_name="Dhanush",
+        phone="9876543210",
+        phone_shared=False,
+        owner_id=existing_owner.id  # ✅ Assign owner_id
+    )
+    db.session.add(sample)
+    db.session.commit()
+
+    generate_qr(sample.license_plate)
+    return "✅ Sample vehicle added!"
+
+# @app.route('/add_sample')
+# def add_sample():
+#     if Vehicle.query.filter_by(license_plate="TS09AB1234").first():
+#         return "Sample vehicle already exists!"
+#     sample = Vehicle(license_plate="TS09AB1234", owner_name="Dhanush", phone="9876543210", phone_shared=False)
+#     db.session.add(sample)
+#     db.session.commit()
+#     generate_qr(sample.license_plate)
+#     return "✅ Sample vehicle added!"
+
+@app.route('/add_sample_owner')
+def add_sample_owner():
+    owner_instance = Owner(name="Dhanush", phone="9876543210")
+    db.session.add(owner_instance)
+    db.session.commit()
+
+    vehicle1 = Vehicle(license_plate="TS09AB1234", owner_id=owner_instance.id)
+    vehicle2 = Vehicle(license_plate="TS09XY5678", owner_id=owner_instance.id)
+    db.session.add_all([vehicle1, vehicle2])
+    db.session.commit()
+
+    return "Sample owner and vehicles added!"
+
+@app.route('/vehicle/<vehicle_id>', methods=["GET", "POST"])
+def vehicle_page(vehicle_id):
+    vehicle = Vehicle.query.filter_by(license_plate=vehicle_id).first()
+    if not vehicle:
+        return "Vehicle not found", 404
+
+    if request.method == "POST":
+        form_type = request.form.get("form_type")
+
+        if form_type == "send_message":
+            sender_name = request.form.get("sender_name") or "Anonymous"
+            msg = request.form.get("message")
+            if msg:
+                new_msg = Message(text=msg, vehicle_id=vehicle.id, sender_name=sender_name)
+                db.session.add(new_msg)
+                db.session.commit()
+                flash("✅ Message sent to owner!")
+                send_telegram_notification(f"📨 New message from {sender_name} for {vehicle.license_plate}:\n{msg}")
+            else:
+                flash("⚠️ Message is empty.", "warning")
+
+        elif form_type == "request_contact":
+            requester = request.form.get("requester") or "Anonymous"
+            new_req = ContactRequest(vehicle_id=vehicle.id, requester=requester)
+            db.session.add(new_req)
+            db.session.commit()
+            flash("📞 Contact request sent to owner!")
+            send_telegram_notification(f"📞 Contact request from {requester} for {vehicle.license_plate}")
+
+        # elif form_type == "maintenance":
+        #     service_type = request.form.get("service_type")
+        #     service_date = request.form.get("service_date")
+        #     next_due_date = request.form.get("next_due_date")
+        #     notes = request.form.get("notes")
+
+        #     record = MaintenanceRecord(
+        #         vehicle_id=vehicle.id,
+        #         service_type=service_type,
+        #         service_date=datetime.strptime(service_date, "%Y-%m-%d"),
+        #         next_due_date=datetime.strptime(next_due_date, "%Y-%m-%d") if next_due_date else None,
+        #         notes=notes
+        #     )
+        #     db.session.add(record)
+        #     db.session.commit()
+        #     flash("🛠️ Maintenance record added!")
+
+        elif form_type == "incident_report":
+            sender_name = request.form.get("incident_sender_name") or "Anonymous"
+            message = request.form.get("incident_message")
+            image = request.files.get("incident_image")
+
+            if not message:
+                flash("⚠️ Incident report must include a message.", "warning")
+                return redirect(url_for('vehicle_page', vehicle_id=vehicle_id))
+
+            filename = None
+            if image and allowed_file(image.filename):
+                filename = f"{uuid.uuid4().hex}_{secure_filename(image.filename)}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                image.save(filepath)
+
+            new_report = IncidentReport(vehicle_id=vehicle.id, sender_name=sender_name, message=message, image_filename=filename)
+            db.session.add(new_report)
+            db.session.commit()
+            flash("✅ Incident reported to owner!")
+            send_telegram_notification(f"⚠️ Incident report from {sender_name} for {vehicle.license_plate}:\n{message}")
+
+        return redirect(url_for('vehicle_page', vehicle_id=vehicle_id))
+
+    return render_template("vehicle.html", vehicle=vehicle)
+
+@app.route('/delete_user_message/<int:message_id>', methods=['POST'])
+def delete_user_message(message_id):
+    if not session.get('logged_in'):
+        return redirect(url_for("login"))
+    message = Message.query.get_or_404(message_id)
+    vehicle = message.vehicle
+    db.session.delete(message)
+    db.session.commit()
+    flash("🗑️ Message deleted.")
+    return redirect(url_for("vehicle_page", vehicle_id=vehicle.license_plate))
+
+@app.route('/dashboard', methods=["GET", "POST"])
+def dashboard():
+    if not session.get('logged_in'):
+        return redirect(url_for("login"))
+
+    vehicle = Vehicle.query.filter_by(license_plate="TS09AB1234").first()
+    if not vehicle:
+        flash("❌ Vehicle not found in DB.", "warning")
+        return redirect(url_for("login"))
+
+    albums = Album.query.filter_by(vehicle_id=vehicle.id).all()
+    incident_reports = IncidentReport.query.filter_by(vehicle_id=vehicle.id).order_by(IncidentReport.timestamp.desc()).all()
+
+    if request.method == "POST":
+        if "trip_image" in request.files:
+            file = request.files["trip_image"]
+            if file and allowed_file(file.filename):
+                filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+                try:
+                    file.save(filepath)
+                    album_name = request.form.get("album_name")
+                    description = request.form.get("description")
+                    location = request.form.get("location")
+
+                    album = None
+                    if album_name:
+                        album = Album.query.filter_by(name=album_name, vehicle_id=vehicle.id).first()
+                        if not album:
+                            album = Album(name=album_name, vehicle_id=vehicle.id)
+                            db.session.add(album)
+                            db.session.commit()
+
+                    photo = TripPhoto(
+                        filename=filename,
+                        vehicle_id=vehicle.id,
+                        description=description,
+                        album_id=album.id if album else None,
+                        timestamp=datetime.utcnow(),
+                        location=location
+                    )
+                    db.session.add(photo)
+                    db.session.commit()
+                    flash("📸 Image uploaded!")
+                except Exception as e:
+                    flash(f"❌ Upload failed: {str(e)}", "danger")
+
+        elif "delete_image_id" in request.form:
+            photo_id = request.form.get("delete_image_id")
+            photo = TripPhoto.query.filter_by(id=photo_id, vehicle_id=vehicle.id).first()
+            if photo:
+                try:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], photo.filename)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    db.session.delete(photo)
+                    db.session.commit()
+                    flash("🗑️ Image deleted!")
+                except Exception as e:
+                    flash(f"❌ Deletion failed: {str(e)}", "danger")
+
+        elif "pin_image_id" in request.form:
+            photo_id = request.form.get("pin_image_id")
+            photo = TripPhoto.query.filter_by(id=photo_id, vehicle_id=vehicle.id).first()
+            if photo:
+                photo.is_pinned = not photo.is_pinned
+                db.session.commit()
+                flash("📌 Image pin toggled!")
+
+        elif "share_phone" in request.form:
+            vehicle.phone_shared = True
+            db.session.commit()
+            flash("📞 Phone number shared!")
+
+        elif "hide_phone" in request.form:
+            vehicle.phone_shared = False
+            db.session.commit()
+            flash("🔒 Phone number hidden!")
+
+        return redirect(url_for('dashboard'))
+
+    vehicle.trip_photos = TripPhoto.query.filter_by(vehicle_id=vehicle.id).all()
+
+    return render_template("dashboard.html", vehicle=vehicle, albums=albums, incidents=incident_reports)
+
+@app.route('/login', methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if request.form["username"] == ADMIN_USERNAME and request.form["password"] == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            return redirect(url_for("dashboard"))
+        else:
+            flash("❌ Invalid credentials.", "warning")
+            return redirect(url_for("login"))
+    return render_template("login.html")
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for("login"))
+
+if __name__ == '__main__':
+     app.run(debug=True, host='0.0.0.0')

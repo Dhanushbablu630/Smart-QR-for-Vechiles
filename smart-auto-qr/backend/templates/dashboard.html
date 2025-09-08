@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+
+<p><strong>Owner:</strong> {{ vehicle.owner_name }}</p>
+<p><strong>Vehicle:</strong> {{ vehicle.license_plate }}</p>
+
+<!-- Phone Toggle -->
+<form method="POST" class="mb-4">
+  {% if vehicle.phone_shared %}
+    <button name="hide_phone" class="btn">Hide Phone Number</button>
+  {% else %}
+    <button name="share_phone" class="btn">Share Phone Number</button>
+  {% endif %}
+</form>
+<div class="mb-6 p-4 bg-blue-900 rounded">
+  <h3 class="text-lg font-bold text-blue-200 mb-3">🏥 Medical Information</h3>
+  <!-- new feature -->
+  {% if vehicle.medical_info %}
+    <div class="text-blue-100 mb-3">
+      {% if vehicle.medical_info.blood_type %}
+        <p><strong>🩸 Blood Type:</strong> {{ vehicle.medical_info.blood_type }}</p>
+      {% endif %}
+      {% if vehicle.medical_info.medical_conditions %}
+        <p><strong>🏥 Medical Conditions:</strong> {{ vehicle.medical_info.medical_conditions }}</p>
+      {% endif %}
+      {% if vehicle.medical_info.allergies %}
+        <p><strong>🚫 Allergies:</strong> {{ vehicle.medical_info.allergies }}</p>
+      {% endif %}
+      {% if vehicle.medical_info.emergency_contact_name %}
+        <p><strong>📞 Emergency Contact:</strong> {{ vehicle.medical_info.emergency_contact_name }} ({{ vehicle.medical_info.emergency_contact_relation }})</p>
+      {% endif %}
+    </div>
+    <a href="{{ url_for('medical_info', vehicle_id=vehicle.license_plate) }}" class="btn bg-blue-600">✏️ Edit Medical Info</a>
+  {% else %}
+    <p class="text-blue-200 mb-3">No medical information added yet.</p>
+    <a href="{{ url_for('medical_info', vehicle_id=vehicle.license_plate) }}" class="btn bg-blue-600">➕ Add Medical Information</a>
+  {% endif %}
+</div>
+<!-- Upload Trip Photo -->
+<form method="POST" enctype="multipart/form-data" class="mb-6">
+  <input type="file" name="trip_image" class="input mb-2" required>
+  <input type="text" name="album_name" placeholder="Album Name (Optional)" class="input mb-2">
+  <input type="text" name="description" placeholder="Description (Optional)" class="input mb-2">
+  <input type="text" name="location" placeholder="Location (Optional)" class="input mb-2">
+  <button type="submit" class="btn">Upload Photo</button>
+</form>
+
+<!-- 🖼️ Trip Gallery by Album -->
+<h3 class="text-xl font-semibold mt-6 mb-4">🖼️ Trip Gallery</h3>
+{% for album in albums %}
+  <h4 class="text-lg font-semibold mb-3">{{ album.name }}</h4>
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    {% for photo in album.photos %}
+      <div class="card overflow-hidden">
+        <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+             class="w-full h-48 object-cover gallery-img cursor-pointer"
+             data-img-url="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+             data-bs-toggle="modal"
+             data-bs-target="#imgModal"
+             alt="Trip Image">
+        <div class="p-3">
+          {% if photo.description %}
+            <p class="font-semibold">{{ photo.description }}</p>
+          {% endif %}
+          <p class="text-sm text-gray-400">🕒 {{ photo.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+          {% if photo.location %}
+            <p class="text-sm text-gray-400">
+              📍 <a href="https://www.google.com/maps/search/{{ photo.location | urlencode }}" target="_blank">{{ photo.location }}</a>
+            </p>
+          {% endif %}
+          <form method="POST" class="mt-2 flex gap-2">
+            <input type="hidden" name="delete_image_id" value="{{ photo.id }}">
+            <button type="submit" class="btn-sm">🗑️ Delete</button>
+          </form>
+          <form method="POST" class="mt-1">
+            <input type="hidden" name="pin_image_id" value="{{ photo.id }}">
+            <button type="submit" class="btn-sm">
+              {% if photo.is_pinned %}📌 Unpin{% else %}📌 Pin{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endfor %}
+
+<!-- 🗂️ Unalbumed Photos -->
+{% set unalbumed = vehicle.trip_photos | selectattr("album_id", "==", None) | list %}
+{% if unalbumed %}
+  <h4 class="text-lg font-semibold mt-6 mb-3">🗂️ Unalbumed Photos</h4>
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    {% for photo in unalbumed %}
+      <div class="card overflow-hidden">
+        <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+             class="w-full h-48 object-cover gallery-img cursor-pointer"
+             data-img-url="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+             data-bs-toggle="modal"
+             data-bs-target="#imgModal"
+             alt="Trip Image">
+        <div class="p-3">
+          {% if photo.description %}
+            <p class="font-semibold">{{ photo.description }}</p>
+          {% endif %}
+          <p class="text-sm text-gray-400">🕒 {{ photo.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+          {% if photo.location %}
+            <p class="text-sm text-gray-400">
+              📍 <a href="https://www.google.com/maps/search/{{ photo.location | urlencode }}" target="_blank">{{ photo.location }}</a>
+            </p>
+          {% endif %}
+          <form method="POST" class="mt-2 flex gap-2">
+            <input type="hidden" name="delete_image_id" value="{{ photo.id }}">
+            <button type="submit" class="btn-sm">🗑️ Delete</button>
+          </form>
+          <form method="POST" class="mt-1">
+            <input type="hidden" name="pin_image_id" value="{{ photo.id }}">
+            <button type="submit" class="btn-sm">
+              {% if photo.is_pinned %}📌 Unpin{% else %}📌 Pin{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<!-- Modal Image View -->
+<div class="modal fade" id="imgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <img src="" id="modalImage" class="img-fluid rounded">
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const imgs = document.querySelectorAll(".gallery-img");
+    imgs.forEach(img => {
+      img.addEventListener("click", () => {
+        const url = img.getAttribute("data-img-url");
+        document.getElementById("modalImage").src = url;
+      });
+    });
+  });
+</script>
+
+<!-- 📨 Messages -->
+<h2 class="text-xl font-semibold mt-6">📨 Messages</h2>
+{% for message in vehicle.messages %}
+  <div class="card p-3 mb-2">
+    <p><strong>{{ message.sender_name }}</strong>: {{ message.text }}</p>
+    <p class="text-sm text-gray-500">🕒 {{ message.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+    <form method="POST" action="{{ url_for('delete_user_message', message_id=message.id) }}">
+      <button type="submit" class="text-red-500 text-sm">Delete</button>
+    </form>
+  </div>
+{% else %}
+  <p>No messages yet.</p>
+{% endfor %}
+
+<!-- ⚠️ Incident Reports -->
+<h2 class="text-xl font-semibold mt-6">⚠️ Incident Reports</h2>
+{% for report in incidents %}
+  <div class="card mb-3 p-3">
+    <p class="text-sm">From: <strong>{{ report.sender_name }}</strong></p>
+    <p>{{ report.message }}</p>
+    <p class="text-xs text-gray-500">🕒 {{ report.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
+    {% if report.image_filename %}
+      <img src="{{ url_for('static', filename='uploads/' ~ report.image_filename) }}"
+           alt="Incident Image"
+           class="mt-2 rounded"
+           style="max-height: 250px; object-fit: cover; cursor: pointer;"
+           data-img-url="{{ url_for('static', filename='uploads/' ~ report.image_filename) }}">
+    {% endif %}
+  </div>
+{% else %}
+  <p>No incidents reported yet.</p>
+{% endfor %}
+
+
+<h3>Add Maintenance</h3>
+<form method="POST">
+  <input type="hidden" name="form_type" value="maintenance">
+  <input type="text" name="service_type" placeholder="Service Type" class="input mb-2">
+  <input type="date" name="service_date" class="input mb-2">
+  <input type="date" name="next_due_date" class="input mb-2">
+  <textarea name="notes" placeholder="Notes" class="input mb-2"></textarea>
+  <button type="submit" class="btn">Add Record</button>
+</form>
+
+
+<a href="{{ url_for('logout') }}" class="btn mt-6">Logout</a>
+
+{% endblock %}

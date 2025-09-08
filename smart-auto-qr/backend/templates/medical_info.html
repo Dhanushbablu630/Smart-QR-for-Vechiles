@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-4">🏥 Medical Information</h1>
+
+<p class="mb-4"><strong>Vehicle:</strong> {{ vehicle.license_plate }} - {{ vehicle.owner_name }}</p>
+
+<div class="bg-red-900 p-4 rounded mb-6">
+    <h2 class="text-lg font-bold text-red-200 mb-2">⚠️ Important Medical Information</h2>
+    <p class="text-red-200 text-sm">This information will be displayed prominently on the vehicle page for emergency situations.</p>
+</div>
+
+<form method="POST" class="space-y-4">
+    
+    <!-- Blood Type -->
+    <div>
+        <label class="block text-sm font-medium mb-2">🩸 Blood Type</label>
+        <select name="blood_type" class="input w-full">
+            <option value="">Select Blood Type</option>
+            <option value="A+" {% if medical_info and medical_info.blood_type == 'A+' %}selected{% endif %}>A+</option>
+            <option value="A-" {% if medical_info and medical_info.blood_type == 'A-' %}selected{% endif %}>A-</option>
+            <option value="B+" {% if medical_info and medical_info.blood_type == 'B+' %}selected{% endif %}>B+</option>
+            <option value="B-" {% if medical_info and medical_info.blood_type == 'B-' %}selected{% endif %}>B-</option>
+            <option value="AB+" {% if medical_info and medical_info.blood_type == 'AB+' %}selected{% endif %}>AB+</option>
+            <option value="AB-" {% if medical_info and medical_info.blood_type == 'AB-' %}selected{% endif %}>AB-</option>
+            <option value="O+" {% if medical_info and medical_info.blood_type == 'O+' %}selected{% endif %}>O+</option>
+            <option value="O-" {% if medical_info and medical_info.blood_type == 'O-' %}selected{% endif %}>O-</option>
+        </select>
+    </div>
+
+    <!-- Medical Conditions -->
+    <div>
+        <label class="block text-sm font-medium mb-2">🏥 Medical Conditions</label>
+        <textarea name="medical_conditions" class="input w-full h-20" placeholder="e.g., Diabetes, Heart condition, High blood pressure, etc.">{% if medical_info %}{{ medical_info.medical_conditions }}{% endif %}</textarea>
+    </div>
+
+    <!-- Allergies -->
+    <div>
+        <label class="block text-sm font-medium mb-2">🚫 Allergies</label>
+        <textarea name="allergies" class="input w-full h-20" placeholder="e.g., Penicillin, Peanuts, Shellfish, etc.">{% if medical_info %}{{ medical_info.allergies }}{% endif %}</textarea>
+    </div>
+
+    <!-- Emergency Medication -->
+    <div>
+        <label class="block text-sm font-medium mb-2">💊 Emergency Medication</label>
+        <textarea name="emergency_medication" class="input w-full h-20" placeholder="e.g., Insulin, EpiPen, Inhaler, etc.">{% if medical_info %}{{ medical_info.emergency_medication }}{% endif %}</textarea>
+    </div>
+
+    <!-- Emergency Contact -->
+    <div class="bg-yellow-900 p-4 rounded">
+        <h3 class="text-lg font-bold text-yellow-200 mb-3">📞 Emergency Contact</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2">Name</label>
+                <input type="text" name="emergency_contact_name" class="input w-full" placeholder="Emergency contact name" value="{% if medical_info %}{{ medical_info.emergency_contact_name }}{% endif %}">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-2">Phone</label>
+                <input type="tel" name="emergency_contact_phone" class="input w-full" placeholder="Emergency contact phone" value="{% if medical_info %}{{ medical_info.emergency_contact_phone }}{% endif %}">
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <label class="block text-sm font-medium mb-2">Relationship</label>
+            <select name="emergency_contact_relation" class="input w-full">
+                <option value="">Select Relationship</option>
+                <option value="Spouse" {% if medical_info and medical_info.emergency_contact_relation == 'Spouse' %}selected{% endif %}>Spouse</option>
+                <option value="Parent" {% if medical_info and medical_info.emergency_contact_relation == 'Parent' %}selected{% endif %}>Parent</option>
+                <option value="Child" {% if medical_info and medical_info.emergency_contact_relation == 'Child' %}selected{% endif %}>Child</option>
+                <option value="Sibling" {% if medical_info and medical_info.emergency_contact_relation == 'Sibling' %}selected{% endif %}>Sibling</option>
+                <option value="Friend" {% if medical_info and medical_info.emergency_contact_relation == 'Friend' %}selected{% endif %}>Friend</option>
+                <option value="Other" {% if medical_info and medical_info.emergency_contact_relation == 'Other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="flex gap-4">
+        <button type="submit" class="btn">💾 Save Medical Information</button>
+        <a href="{{ url_for('dashboard') }}" class="btn bg-gray-600">← Back to Dashboard</a>
+    </div>
+</form>
+
+{% endblock %}
