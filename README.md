@@ -1,7 +1,4 @@
-# QR-Code-for-vechiles
-Perfect 👌 since your **Smart Auto QR** vehicle project is completed, here’s a clean and professional **README.md** you can directly use for GitHub or portfolio:
 
----
 
 # 🚗 Smart Auto QR
 
