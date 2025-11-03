@@ -132,7 +132,7 @@ Then open your browser and visit:
 ## 🧑‍💻 Author
 
 **Dhanush**
-📧 [[your-email@example.com](sangisetti.dhanush.work@gmail.com)]
-🔗 [LinkedIn Profile](#) | [Dhanushbablu630](#)
+📧 [[sangisetti.dhanush.work@gmail.com](sangisetti.dhanush.work@gmail.com)]
+🔗 [(https://www.linkedin.com/in/Dhanush-Sangisetti/)](#) | [](#)
 
 
